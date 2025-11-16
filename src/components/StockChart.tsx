@@ -10,8 +10,9 @@ import {
   type HistogramData,
   type Time,
   type BusinessDay,
+  type SeriesMarker,
 } from 'lightweight-charts';
-import type { StockData, PriceLine as PriceLineType, DividendData } from '../types';
+import type { StockData, PriceLine as PriceLineType, DividendData, DividendRangeStat } from '../types';
 import './StockChart.css';
 
 const formatDateLabel = (time: Time | string | number | undefined) => {
@@ -25,8 +26,15 @@ const formatDateLabel = (time: Time | string | number | undefined) => {
   return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
 };
 
+const normalizeDateString = (value: string) => {
+  if (!value) return '';
+  return value.includes('T') ? value.split('T')[0] : value;
+};
+
 const toBusinessDay = (dateString: string): BusinessDay | null => {
-  const [yearStr, monthStr, dayStr] = dateString.split('-');
+  const normalized = normalizeDateString(dateString);
+  if (!normalized) return null;
+  const [yearStr, monthStr, dayStr] = normalized.split('-');
   const year = Number(yearStr);
   const month = Number(monthStr);
   const day = Number(dayStr);
@@ -36,6 +44,19 @@ const toBusinessDay = (dateString: string): BusinessDay | null => {
   return { year, month: month as BusinessDay['month'], day: day as BusinessDay['day'] };
 };
 
+const toTimestamp = (dateString: string): number | null => {
+  const normalized = normalizeDateString(dateString);
+  const timestamp = Date.parse(normalized);
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
+const toChartTime = (dateString: string): Time | null => {
+  const businessDay = toBusinessDay(dateString);
+  if (businessDay) return businessDay;
+  const timestamp = toTimestamp(dateString);
+  return timestamp !== null ? (timestamp / 1000) as Time : null;
+};
+
 interface StockChartProps {
   data: StockData[];
   priceLines: PriceLineType[];
@@ -43,6 +64,7 @@ interface StockChartProps {
   showVolume?: boolean;
   showDividends?: boolean;
   onCrosshairMove?: (data: StockData | null) => void;
+  dividendRangeStats?: DividendRangeStat[];
 }
 
 export const StockChart: React.FC<StockChartProps> = ({
@@ -52,6 +74,7 @@ export const StockChart: React.FC<StockChartProps> = ({
   showVolume = true,
   showDividends = true,
   onCrosshairMove,
+  dividendRangeStats = [],
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -243,27 +266,24 @@ export const StockChart: React.FC<StockChartProps> = ({
     const paddingRight = parseFloat(styles.paddingRight || '0');
     const innerWidth = container.clientWidth - paddingLeft - paddingRight;
 
-    const markers = dividends.reduce<Array<{ id: string; left: number; date: string; amount: number }>>(
-      (acc, dividend, index) => {
-        const businessDay = toBusinessDay(dividend.date);
-        const coordinate = businessDay ? timeScale.timeToCoordinate(businessDay) : null;
-        if (coordinate === null || coordinate === undefined) {
-          return acc;
-        }
-        const left = Number(coordinate);
-        if (Number.isNaN(left) || left < 0 || left > innerWidth) {
-          return acc;
-        }
-        acc.push({
-          id: `${dividend.date}-${index}`,
-          left,
-          date: dividend.date,
-          amount: dividend.amount,
-        });
+    const markers = dividends.reduce<Array<{ id: string; left: number; date: string; amount: number }>>((acc, dividend, index) => {
+      const time = toChartTime(dividend.date);
+      const coordinate = time ? timeScale.timeToCoordinate(time) : null;
+      if (coordinate === null || coordinate === undefined) {
         return acc;
-      },
-      [],
-    );
+      }
+      const relativeLeft = Number(coordinate);
+      if (Number.isNaN(relativeLeft) || relativeLeft < 0 || relativeLeft > innerWidth) {
+        return acc;
+      }
+      acc.push({
+        id: `${dividend.date}-${index}`,
+        left: relativeLeft + paddingLeft,
+        date: dividend.date,
+        amount: dividend.amount,
+      });
+      return acc;
+    }, []);
 
     setDividendMarkers(markers);
     setActiveDividendId(prev => (markers.some(marker => marker.id === prev) ? prev : null));
@@ -294,29 +314,47 @@ export const StockChart: React.FC<StockChartProps> = ({
   useEffect(() => {
     if (!candlestickSeriesRef.current || !data) return;
 
-    const formattedData = data.map(item => ({
-      time: toBusinessDay(item.time) ?? item.time,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-    }));
+    const formattedData = data
+      .map(item => {
+        const time = toChartTime(item.time);
+        if (!time) {
+          return null;
+        }
+        return {
+          time,
+          open: item.open,
+          high: item.high,
+          low: item.low,
+          close: item.close,
+        };
+      })
+      .filter((item): item is CandlestickData<Time> => item !== null);
 
     candlestickSeriesRef.current.setData(formattedData);
     if (formattedData.length) {
       chartRef.current?.timeScale().fitContent();
     }
-    dataRef.current = data;
+    dataRef.current = data.map(point => ({
+      ...point,
+      time: normalizeDateString(point.time),
+    }));
   }, [data]);
 
   // Update volume histogram data
   useEffect(() => {
     if (!volumeSeriesRef.current) return;
-    const formattedVolume: HistogramData<Time>[] = data.map(item => ({
-      time: toBusinessDay(item.time) ?? item.time,
-      value: item.volume ?? 0,
-      color: item.close >= item.open ? '#26a69a' : '#ef5350',
-    }));
+    const formattedVolume = data.reduce<HistogramData<Time>[]>((acc, item) => {
+      const time = toChartTime(item.time);
+      if (!time) {
+        return acc;
+      }
+      acc.push({
+        time,
+        value: item.volume ?? 0,
+        color: item.close >= item.open ? '#26a69a' : '#ef5350',
+      });
+      return acc;
+    }, []);
 
     volumeSeriesRef.current.setData(formattedVolume);
   }, [data]);
@@ -359,6 +397,60 @@ export const StockChart: React.FC<StockChartProps> = ({
     });
     priceLinesRef.current = newPriceLines;
   }, [priceLines]);
+
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (!dividendRangeStats.length) {
+      series.setMarkers([]);
+      return;
+    }
+
+    const markerEntries: Array<{ marker: SeriesMarker<Time>; timestamp: number }> = [];
+    const markerKeys = new Set<string>();
+
+    const pushMarker = (
+      point: NonNullable<DividendRangeStat['high']>,
+      position: 'aboveBar' | 'belowBar',
+      color: string,
+    ) => {
+      const normalizedDate = normalizeDateString(point.date);
+      const key = `${normalizedDate}-${position}`;
+      if (markerKeys.has(key)) {
+        return;
+      }
+      const time = toChartTime(normalizedDate);
+      const timestamp = toTimestamp(normalizedDate);
+      if (!time || timestamp === null) {
+        return;
+      }
+      markerKeys.add(key);
+      markerEntries.push({
+        timestamp,
+        marker: {
+          time,
+          position,
+          shape: 'circle',
+          color,
+          size: 1,
+          text: Math.trunc(point.value).toString(),
+        },
+      });
+    };
+
+    dividendRangeStats.forEach((stat) => {
+      if (stat.high) {
+        pushMarker(stat.high, 'aboveBar', '#a7f294');
+      }
+      if (stat.low) {
+        pushMarker(stat.low, 'belowBar', '#ff6f91');
+      }
+    });
+
+    markerEntries.sort((a, b) => a.timestamp - b.timestamp);
+    series.setMarkers(markerEntries.map(entry => entry.marker));
+  }, [dividendRangeStats]);
 
   return (
     <div className="stock-chart-container">

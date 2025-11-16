@@ -8,6 +8,11 @@ interface DividendRangeAnalysisProps {
 }
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString('ko-KR');
+const formatDays = (days?: number) => {
+  if (days === undefined) return '-';
+  const sign = days > 0 ? '+' : days < 0 ? '-' : '';
+  return `${sign}${Math.abs(days)}일`;
+};
 
 export const DividendRangeAnalysis: React.FC<DividendRangeAnalysisProps> = ({ stats, loading }) => {
   if (loading) {
@@ -43,6 +48,10 @@ export const DividendRangeAnalysis: React.FC<DividendRangeAnalysisProps> = ({ st
               {stat.high ? (
                 <span className="value">
                   ₩{stat.high.value.toLocaleString()} · {formatDate(stat.high.date)}
+                  <span className="offsets">
+                    <span>이전 배당 {formatDays(stat.high.daysFromStart)}</span>
+                    <span>다음 배당 {formatDays(stat.high.daysToEnd)}</span>
+                  </span>
                 </span>
               ) : (
                 <span className="value muted">데이터 없음</span>
@@ -53,6 +62,10 @@ export const DividendRangeAnalysis: React.FC<DividendRangeAnalysisProps> = ({ st
               {stat.low ? (
                 <span className="value">
                   ₩{stat.low.value.toLocaleString()} · {formatDate(stat.low.date)}
+                  <span className="offsets">
+                    <span>이전 배당 {formatDays(stat.low.daysFromStart)}</span>
+                    <span>다음 배당 {formatDays(stat.low.daysToEnd)}</span>
+                  </span>
                 </span>
               ) : (
                 <span className="value muted">데이터 없음</span>

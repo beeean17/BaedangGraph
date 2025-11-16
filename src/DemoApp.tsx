@@ -76,6 +76,7 @@ export const DemoApp: React.FC = () => {
             priceLines={priceLines}
             dividends={dividends}
             showDividends={showDividends}
+            dividendRangeStats={dividendRangeStats}
           />
         </div>
 

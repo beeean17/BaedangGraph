@@ -65,6 +65,16 @@
 
 .range-row .value {
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.range-row .value .offsets {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
 }
 
 .range-row .value.muted {

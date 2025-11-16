@@ -22,6 +22,7 @@ export const Dashboard: React.FC = () => {
     () => buildDividendRangeStats(stockData, dividends),
     [stockData, dividends],
   );
+  const hasChartData = stockData.length > 0;
 
   const handleLogout = async () => {
     try {
@@ -79,17 +80,33 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="chart-wrapper">
-          {loading && <div className="info-section">Loading chart data...</div>}
-          {error && <div className="info-section error-message">{error}</div>}
-          {!loading && !error && (
-            <StockChart
-              data={stockData}
-              priceLines={priceLines}
-              dividends={dividends}
-              showVolume={showVolume}
-              showDividends={showDividends}
-              onCrosshairMove={setChartCrosshairData}
-            />
+          {error && (
+            <div className="info-section error-message">{error}</div>
+          )}
+
+          {hasChartData && !error && (
+            <>
+              <StockChart
+                data={stockData}
+                priceLines={priceLines}
+                dividends={dividends}
+                showVolume={showVolume}
+                showDividends={showDividends}
+                dividendRangeStats={dividendRangeStats}
+                onCrosshairMove={setChartCrosshairData}
+              />
+              {loading && (
+                <div className="chart-loading-overlay">
+                  <span>새 데이터를 불러오는 중...</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {!error && !hasChartData && (
+            <div className="chart-status-card">
+              {loading ? '차트 데이터를 불러오는 중입니다...' : '표시할 차트 데이터가 없습니다.'}
+            </div>
           )}
         </div>
 

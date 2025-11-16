@@ -22,10 +22,14 @@ export interface DividendRangeStat {
   high?: {
     value: number;
     date: string;
+    daysFromStart: number;
+    daysToEnd: number;
   };
   low?: {
     value: number;
     date: string;
+    daysFromStart: number;
+    daysToEnd: number;
   };
 }
 
