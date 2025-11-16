@@ -1,0 +1,52 @@
+.dividend-info-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+.dividend-info-container h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.3em;
+}
+
+.no-dividends {
+  color: #999;
+  font-style: italic;
+}
+
+.dividend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dividend-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+}
+
+.dividend-date,
+.dividend-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dividend-item .label {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: 500;
+}
+
+.dividend-item .value {
+  font-size: 1.1em;
+  color: #333;
+  font-weight: 600;
+}
