@@ -1,5 +1,5 @@
 import React from 'react';
-import type { StockData } from '../types';
+import type { StockData, DividendData } from '../types';
 import './ChartInfo.css';
 
 type ChartInfoTime = string | { day: number; month: number; year: number };
@@ -8,6 +8,7 @@ type ChartInfoData = Omit<Partial<StockData>, 'time'> & { time?: ChartInfoTime }
 
 interface ChartInfoProps {
   data: ChartInfoData | null;
+  dividend?: DividendData | null;
 }
 
 const formatPrice = (price: number | undefined) => {
@@ -26,7 +27,15 @@ const formatDate = (time: ChartInfoTime | undefined) => {
   return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
 };
 
-export const ChartInfo: React.FC<ChartInfoProps> = ({ data }) => {
+const formatDividend = (dividend?: DividendData | null) => {
+  if (!dividend) return null;
+  const amount = Math.trunc(dividend.amount).toLocaleString();
+  const date = new Date(dividend.date).toLocaleDateString();
+  return { amount, date };
+};
+
+export const ChartInfo: React.FC<ChartInfoProps> = ({ data, dividend }) => {
+  const formattedDividend = formatDividend(dividend);
   return (
     <div className="chart-info">
       {data ? (
@@ -54,6 +63,15 @@ export const ChartInfo: React.FC<ChartInfoProps> = ({ data }) => {
             <div className="info-item">
               <span className="label">V:</span>
               <span className="value">{data.volume.toLocaleString()}</span>
+            </div>
+          )}
+          {formattedDividend && (
+            <div className="info-item dividend-info">
+              <span className="label">배당:</span>
+              <div className="value-block">
+                <span className="value">{formattedDividend.date}</span>
+                <span className="value">₩{formattedDividend.amount}</span>
+              </div>
             </div>
           )}
         </>

@@ -3,30 +3,9 @@ import { useAuth } from '../hooks/useAuth';
 import './Login.css';
 
 export const Login: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, signup, signInWithGoogle } = useAuth();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await signup(email, password);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { signInWithGoogle } = useAuth();
 
   const handleGoogleSignIn = async () => {
     setError('');
@@ -46,42 +25,9 @@ export const Login: React.FC = () => {
         <h1>BaedangGraph</h1>
         <p className="subtitle">Stock Chart Visualization with Dividend Tracking</p>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-            />
-          </div>
+        <p className="subtitle">Google 계정으로만 로그인할 수 있습니다.</p>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              minLength={6}
-            />
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <button type="submit" disabled={loading} className="submit-btn">
-            {loading ? 'Processing...' : (isLogin ? 'Login' : 'Sign Up')}
-          </button>
-        </form>
-
-        <div className="divider">
-          <span>OR</span>
-        </div>
+        {error && <div className="error-message">{error}</div>}
 
         <button onClick={handleGoogleSignIn} disabled={loading} className="google-btn">
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
@@ -92,18 +38,6 @@ export const Login: React.FC = () => {
           </svg>
           <span>Sign in with Google</span>
         </button>
-
-        <div className="toggle-mode">
-          <button
-            type="button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-            }}
-          >
-            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
-          </button>
-        </div>
       </div>
     </div>
   );

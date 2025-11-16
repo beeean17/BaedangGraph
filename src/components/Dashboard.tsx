@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useUserData } from '../hooks/useUserData';
 import { useStockData } from '../hooks/useStockData';
+import { useStockList } from '../hooks/useStockList';
 import { StockChart } from './StockChart';
 import { PriceLineManager } from './PriceLineManager';
 import { ChartInfo } from './ChartInfo';
@@ -13,7 +14,8 @@ import './Dashboard.css';
 export const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const { priceLines, addPriceLine, removePriceLine, updatePriceLine } = useUserData();
-  const [symbol, setSymbol] = useState('AAPL'); // Default symbol
+  const [symbol, setSymbol] = useState('');
+  const { stocks, loading: stockListLoading, error: stockListError } = useStockList();
   const { stockData, dividends, loading, error } = useStockData(symbol);
   const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null);
   const [showVolume, setShowVolume] = useState(true);
@@ -23,6 +25,30 @@ export const Dashboard: React.FC = () => {
     [stockData, dividends],
   );
   const hasChartData = stockData.length > 0;
+
+  const sortedStocks = useMemo(() => {
+    const periodPriority: Record<string, number> = { '월중': 0, '월말': 1 };
+    return [...stocks].sort((a, b) => {
+      const periodOrderA = periodPriority[a.period ?? ''] ?? 2;
+      const periodOrderB = periodPriority[b.period ?? ''] ?? 2;
+      if (periodOrderA !== periodOrderB) {
+        return periodOrderA - periodOrderB;
+      }
+      return a.id.localeCompare(b.id, 'ko');
+    });
+  }, [stocks]);
+
+  const formatStockLabel = (stock: (typeof stocks)[number]) => {
+    const periodLabel = stock.period === '월중' || stock.period === '월말' ? stock.period : stock.period ?? '';
+    const namePart = stock.name ?? '';
+    return [stock.id, periodLabel, namePart].filter(Boolean).join(' ');
+  };
+
+  useEffect(() => {
+    if (!symbol && sortedStocks.length > 0) {
+      setSymbol(sortedStocks[0].id);
+    }
+  }, [symbol, sortedStocks]);
 
   const handleLogout = async () => {
     try {
@@ -48,20 +74,23 @@ export const Dashboard: React.FC = () => {
 
       <div className="dashboard-content">
         <div className="symbol-selector">
-          <label htmlFor="symbol">Stock Symbol:</label>
           <select
             id="symbol"
             value={symbol}
+            disabled={stockListLoading || !sortedStocks.length}
             onChange={(e) => setSymbol(e.target.value)}
+            aria-label="Select stock symbol"
           >
-            <option value="AAPL">AAPL - Apple Inc.</option>
-            <option value="GOOGL">GOOGL - Alphabet Inc.</option>
-            <option value="MSFT">MSFT - Microsoft Corporation</option>
-            <option value="AMZN">AMZN - Amazon.com Inc.</option>
-            <option value="TSLA">TSLA - Tesla Inc.</option>
-            {/* Example for a user-defined stock ID from the markdown */}
-            <option value="475080">475080 - (Custom Stock)</option>
+            {!sortedStocks.length && <option value="">종목을 불러오는 중...</option>}
+            {sortedStocks.map(stock => (
+              <option key={stock.id} value={stock.id}>
+                {formatStockLabel(stock)}
+              </option>
+            ))}
           </select>
+          {stockListError && (
+            <span className="stock-error">종목 목록을 불러오지 못했습니다.</span>
+          )}
           <button
             type="button"
             className="volume-toggle"

@@ -1,9 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useEffect, useState } from 'react';
-import { 
+import {
   type User,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   signInWithPopup,
@@ -14,8 +12,6 @@ import { auth, db, googleProvider } from '../firebase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
 }
@@ -50,31 +46,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
-  const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-  };
-
-  const signup = async (email: string, password: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    // The onAuthStateChanged listener will handle user creation
-    await handleUser(userCredential.user);
-  };
-
   const logout = async () => {
     await signOut(auth);
   };
 
   const signInWithGoogle = async () => {
-    const userCredential = await signInWithPopup(auth, googleProvider);
-    // The onAuthStateChanged listener will handle user creation
-    await handleUser(userCredential.user);
+    const result = await signInWithPopup(auth, googleProvider);
+    await handleUser(result.user);
   };
 
   const value = {
     user,
     loading,
-    login,
-    signup,
     logout,
     signInWithGoogle,
   };
