@@ -15,6 +15,7 @@ export const Dashboard: React.FC = () => {
   const [symbol, setSymbol] = useState('AAPL'); // Default symbol
   const { stockData, dividends, loading, error } = useStockData(symbol);
   const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null); // New state for crosshair data
+  const [showVolume, setShowVolume] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -54,6 +55,13 @@ export const Dashboard: React.FC = () => {
             {/* Example for a user-defined stock ID from the markdown */}
             <option value="475080">475080 - (Custom Stock)</option>
           </select>
+          <button
+            type="button"
+            className="volume-toggle"
+            onClick={() => setShowVolume(prev => !prev)}
+          >
+            {showVolume ? '거래량 숨기기' : '거래량 표시'}
+          </button>
           <ChartInfo data={chartCrosshairData} /> {/* Render ChartInfo here */}
         </div>
 
@@ -63,6 +71,7 @@ export const Dashboard: React.FC = () => {
           <StockChart
             data={stockData}
             priceLines={priceLines}
+            showVolume={showVolume}
             onCrosshairMove={setChartCrosshairData} // Pass the setter function
           />
         )}

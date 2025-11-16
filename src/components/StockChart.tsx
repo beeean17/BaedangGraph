@@ -7,6 +7,7 @@ import {
   type ISeriesApi,
   type MouseEventParams,
   type CandlestickData,
+  type HistogramData,
   type Time,
 } from 'lightweight-charts';
 import type { StockData, PriceLine as PriceLineType } from '../types';
@@ -15,14 +16,17 @@ import './StockChart.css';
 interface StockChartProps {
   data: StockData[];
   priceLines: PriceLineType[];
+  showVolume?: boolean;
   onCrosshairMove?: (data: StockData | null) => void;
 }
 
-export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCrosshairMove }) => {
+export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVolume = true, onCrosshairMove }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const crosshairMoveHandlerRef = useRef<((param: MouseEventParams) => void) | null>(null);
+  const dataRef = useRef<StockData[]>([]);
   const priceLinesRef = useRef<Array<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>>>([]);
 
   // Effect for chart creation and resizing
@@ -78,6 +82,26 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
       },
     });
 
+    volumeSeriesRef.current = chart.addHistogramSeries({
+      priceScaleId: 'volume',
+      priceFormat: {
+        type: 'volume',
+      },
+      priceLineVisible: false,
+      color: '#26a69a',
+      baseLineVisible: false,
+    });
+
+    chart.priceScale('right').applyOptions({
+      scaleMargins: { top: 0.1, bottom: showVolume ? 0.2 : 0.05 },
+    });
+
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: showVolume ? { top: 0.8, bottom: 0 } : { top: 1, bottom: 0 },
+    });
+
+    volumeSeriesRef.current.applyOptions({ visible: showVolume });
+
     // Perform an initial resize to fit the container immediately
     chart.resize(
       chartContainerRef.current.clientWidth,
@@ -115,13 +139,15 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
             ? new Date(param.time * 1000).toISOString().split('T')[0]
             : (param.time as string);
 
+        const matchedVolume = dataRef.current.find(item => item.time === normalizedTime)?.volume;
+
         onCrosshairMove({
           time: normalizedTime,
           open: Math.trunc(dataPoint.open),
           high: Math.trunc(dataPoint.high),
           low: Math.trunc(dataPoint.low),
           close: Math.trunc(dataPoint.close),
-          volume: undefined,
+          volume: matchedVolume !== undefined ? Math.trunc(matchedVolume) : undefined,
         });
       };
 
@@ -138,8 +164,9 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
       chart.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
+      volumeSeriesRef.current = null;
     };
-  }, [onCrosshairMove]); // Add onCrosshairMove to dependencies
+  }, [onCrosshairMove]);
 
   // Update chart data
   useEffect(() => {
@@ -157,7 +184,34 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
     if (formattedData.length) {
       chartRef.current?.timeScale().fitContent();
     }
+    dataRef.current = data;
   }, [data]);
+
+  // Update volume histogram data
+  useEffect(() => {
+    if (!volumeSeriesRef.current) return;
+    const formattedVolume: HistogramData<Time>[] = data.map(item => ({
+      time: item.time,
+      value: item.volume ?? 0,
+      color: item.close >= item.open ? '#26a69a' : '#ef5350',
+    }));
+
+    volumeSeriesRef.current.setData(formattedVolume);
+  }, [data]);
+
+  // Toggle volume visibility
+  useEffect(() => {
+    if (!volumeSeriesRef.current || !chartRef.current) return;
+    volumeSeriesRef.current.applyOptions({ visible: showVolume });
+
+    chartRef.current.priceScale('right').applyOptions({
+      scaleMargins: { top: 0.1, bottom: showVolume ? 0.2 : 0.05 },
+    });
+
+    chartRef.current.priceScale('volume').applyOptions({
+      scaleMargins: showVolume ? { top: 0.8, bottom: 0 } : { top: 1, bottom: 0 },
+    });
+  }, [showVolume]);
 
   // Update price lines
   useEffect(() => {
