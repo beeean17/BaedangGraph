@@ -13,6 +13,22 @@ export interface DividendData {
   currency?: string;
 }
 
+export interface DividendRangeStat {
+  id: string;
+  startDate: string;
+  endDate: string;
+  startDividendAmount: number;
+  endDividendAmount: number;
+  high?: {
+    value: number;
+    date: string;
+  };
+  low?: {
+    value: number;
+    date: string;
+  };
+}
+
 export interface PriceLine {
   id: string;
   price: number;

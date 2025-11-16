@@ -121,9 +121,15 @@
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
 }
 
+.chart-wrapper {
+  width: 100%;
+}
+
 .info-grid {
   display: grid;
   gap: var(--spacing-lg);
+  grid-template-columns: 1fr;
+  align-items: stretch;
 }
 
 .info-section h3 {
@@ -156,19 +162,16 @@
 @media (min-width: 768px) {
   .dashboard-content {
     grid-template-columns: repeat(2, 1fr);
-    grid-template-areas:
-      "selector selector"
-      "chart chart"
-      "grid grid"
-      "info info";
   }
 
-  .symbol-selector { grid-area: selector; }
-  .stock-chart-container { grid-area: chart; }
-  .info-grid { grid-area: grid; }
-  .info-section { grid-area: info; }
+  .symbol-selector,
+  .chart-wrapper,
+  .info-grid,
+  .info-section {
+    grid-column: 1 / -1;
+  }
 
   .info-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

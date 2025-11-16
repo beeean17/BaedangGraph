@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StockChart } from './components/StockChart';
-import { DividendInfo } from './components/DividendInfo';
 import { PriceLineManager } from './components/PriceLineManager';
 import type { StockData, DividendData, PriceLine } from './types';
 import { generateSampleStockData, generateSampleDividends } from './utils/sampleData';
+import { DividendRangeAnalysis } from './components/DividendRangeAnalysis';
+import { buildDividendRangeStats } from './utils/dividendAnalysis';
 import './components/Dashboard.css';
 
 // Demo component to showcase the dashboard without authentication
@@ -20,6 +21,7 @@ export const DemoApp: React.FC = () => {
   ]);
   const [symbol, setSymbol] = useState('AAPL');
   const [showDividends, setShowDividends] = useState(true);
+  const dividendRangeStats = useMemo(() => buildDividendRangeStats(stockData, dividends), [stockData, dividends]);
 
   const handleAddPriceLine = (line: Omit<PriceLine, 'id'>) => {
     const newLine: PriceLine = {
@@ -68,15 +70,17 @@ export const DemoApp: React.FC = () => {
           </button>
         </div>
 
+        <div className="chart-wrapper">
           <StockChart
             data={stockData}
             priceLines={priceLines}
             dividends={dividends}
             showDividends={showDividends}
           />
+        </div>
 
         <div className="info-grid">
-          <DividendInfo dividends={dividends} loading={false} />
+          <DividendRangeAnalysis stats={dividendRangeStats} loading={false} />
           <PriceLineManager
             priceLines={priceLines}
             onAdd={handleAddPriceLine}

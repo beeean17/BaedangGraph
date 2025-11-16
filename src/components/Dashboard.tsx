@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useUserData } from '../hooks/useUserData';
 import { useStockData } from '../hooks/useStockData';
 import { StockChart } from './StockChart';
-import { DividendInfo } from './DividendInfo';
 import { PriceLineManager } from './PriceLineManager';
 import { ChartInfo } from './ChartInfo';
+import { DividendRangeAnalysis } from './DividendRangeAnalysis';
 import type { StockData } from '../types';
+import { buildDividendRangeStats } from '../utils/dividendAnalysis';
 import './Dashboard.css';
 
 export const Dashboard: React.FC = () => {
@@ -17,6 +18,10 @@ export const Dashboard: React.FC = () => {
   const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null);
   const [showVolume, setShowVolume] = useState(true);
   const [showDividends, setShowDividends] = useState(true);
+  const dividendRangeStats = useMemo(
+    () => buildDividendRangeStats(stockData, dividends),
+    [stockData, dividends],
+  );
 
   const handleLogout = async () => {
     try {
@@ -73,21 +78,23 @@ export const Dashboard: React.FC = () => {
           <ChartInfo data={chartCrosshairData} />
         </div>
 
-        {loading && <div className="info-section">Loading chart data...</div>}
-        {error && <div className="info-section error-message">{error}</div>}
-        {!loading && !error && (
-          <StockChart
-            data={stockData}
-            priceLines={priceLines}
-            dividends={dividends}
-            showVolume={showVolume}
-            showDividends={showDividends}
-            onCrosshairMove={setChartCrosshairData}
-          />
-        )}
+        <div className="chart-wrapper">
+          {loading && <div className="info-section">Loading chart data...</div>}
+          {error && <div className="info-section error-message">{error}</div>}
+          {!loading && !error && (
+            <StockChart
+              data={stockData}
+              priceLines={priceLines}
+              dividends={dividends}
+              showVolume={showVolume}
+              showDividends={showDividends}
+              onCrosshairMove={setChartCrosshairData}
+            />
+          )}
+        </div>
 
         <div className="info-grid">
-          <DividendInfo dividends={dividends} loading={loading} />
+          <DividendRangeAnalysis stats={dividendRangeStats} loading={loading} />
           <PriceLineManager
             priceLines={priceLines}
             onAdd={addPriceLine}

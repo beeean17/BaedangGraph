@@ -45,7 +45,14 @@ interface StockChartProps {
   onCrosshairMove?: (data: StockData | null) => void;
 }
 
-export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, dividends = [], showVolume = true, showDividends = true, onCrosshairMove }) => {
+export const StockChart: React.FC<StockChartProps> = ({
+  data,
+  priceLines,
+  dividends = [],
+  showVolume = true,
+  showDividends = true,
+  onCrosshairMove,
+}) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -103,7 +110,8 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, divide
         },
       },
       localization: {
-        timeFormatter: (businessDayOrTimestamp) => formatDateLabel(businessDayOrTimestamp) ?? '',
+        timeFormatter: (businessDayOrTimestamp: Time | number | string | undefined) =>
+          formatDateLabel(businessDayOrTimestamp) ?? '',
       },
     });
 
@@ -235,23 +243,27 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, divide
     const paddingRight = parseFloat(styles.paddingRight || '0');
     const innerWidth = container.clientWidth - paddingLeft - paddingRight;
 
-    const markers = dividends
-      .map((dividend, index) => {
+    const markers = dividends.reduce<Array<{ id: string; left: number; date: string; amount: number }>>(
+      (acc, dividend, index) => {
         const businessDay = toBusinessDay(dividend.date);
         const coordinate = businessDay ? timeScale.timeToCoordinate(businessDay) : null;
         if (coordinate === null || coordinate === undefined) {
-          return null;
+          return acc;
         }
-        return {
+        const left = Number(coordinate);
+        if (Number.isNaN(left) || left < 0 || left > innerWidth) {
+          return acc;
+        }
+        acc.push({
           id: `${dividend.date}-${index}`,
-          left: coordinate,
+          left,
           date: dividend.date,
           amount: dividend.amount,
-        };
-      })
-      .filter((marker): marker is { id: string; left: number; date: string; amount: number } => {
-        return marker !== null && marker.left >= 0 && marker.left <= innerWidth;
-      });
+        });
+        return acc;
+      },
+      [],
+    );
 
     setDividendMarkers(markers);
     setActiveDividendId(prev => (markers.some(marker => marker.id === prev) ? prev : null));
