@@ -1,29 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useUserData } from '../hooks/useUserData';
+import { useStockData } from '../hooks/useStockData';
 import { StockChart } from './StockChart';
 import { DividendInfo } from './DividendInfo';
 import { PriceLineManager } from './PriceLineManager';
-import type { StockData, DividendData } from '../types';
-import { generateSampleStockData, generateSampleDividends } from '../utils/sampleData';
+import { ChartInfo } from './ChartInfo'; // Import ChartInfo
+import type { StockData } from '../types'; // Import StockData type for state
 import './Dashboard.css';
 
 export const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const { userData, addPriceLine, removePriceLine, updatePriceLine } = useUserData();
-  const [stockData, setStockData] = useState<StockData[]>([]);
-  const [dividends, setDividends] = useState<DividendData[]>([]);
-  const [symbol, setSymbol] = useState('AAPL');
-
-  useEffect(() => {
-    // In a real app, this would fetch data from Firebase or an API
-    // For demo purposes, we generate sample data
-    const loadData = () => {
-      setStockData(generateSampleStockData(100));
-      setDividends(generateSampleDividends());
-    };
-    loadData();
-  }, [symbol]);
+  const { priceLines, addPriceLine, removePriceLine, updatePriceLine } = useUserData();
+  const [symbol, setSymbol] = useState('AAPL'); // Default symbol
+  const { stockData, dividends, loading, error } = useStockData(symbol);
+  const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null); // New state for crosshair data
 
   const handleLogout = async () => {
     try {
@@ -60,18 +51,26 @@ export const Dashboard: React.FC = () => {
             <option value="MSFT">MSFT - Microsoft Corporation</option>
             <option value="AMZN">AMZN - Amazon.com Inc.</option>
             <option value="TSLA">TSLA - Tesla Inc.</option>
+            {/* Example for a user-defined stock ID from the markdown */}
+            <option value="475080">475080 - (Custom Stock)</option>
           </select>
+          <ChartInfo data={chartCrosshairData} /> {/* Render ChartInfo here */}
         </div>
 
-        <StockChart
-          data={stockData}
-          priceLines={userData?.priceLines || []}
-        />
+        {loading && <div className="info-section">Loading chart data...</div>}
+        {error && <div className="info-section error-message">{error}</div>}
+        {!loading && !error && (
+          <StockChart
+            data={stockData}
+            priceLines={priceLines}
+            onCrosshairMove={setChartCrosshairData} // Pass the setter function
+          />
+        )}
 
         <div className="info-grid">
-          <DividendInfo dividends={dividends} />
+          <DividendInfo dividends={dividends} loading={loading} />
           <PriceLineManager
-            priceLines={userData?.priceLines || []}
+            priceLines={priceLines}
             onAdd={addPriceLine}
             onRemove={removePriceLine}
             onUpdate={updatePriceLine}
@@ -93,3 +92,4 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
+

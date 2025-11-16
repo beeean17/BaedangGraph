@@ -1,51 +1,61 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart } from 'lightweight-charts';
-import type { StockData, PriceLine } from '../types';
+import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts';
+import type { StockData, PriceLine as PriceLineType } from '../types';
 import './StockChart.css';
 
 interface StockChartProps {
   data: StockData[];
-  priceLines: PriceLine[];
-  onPriceLineClick?: (lineId: string) => void;
+  priceLines: PriceLineType[];
+  onCrosshairMove?: (data: StockData | null) => void;
 }
 
-export const StockChart: React.FC<StockChartProps> = ({ data, priceLines }) => {
+export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCrosshairMove }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
-  const candlestickSeriesRef = useRef<ReturnType<ReturnType<typeof createChart>['addCandlestickSeries']> | null>(null);
+  const candlestickSeriesRef = useRef<ReturnType<typeof chartRef.current.addCandlestickSeries> | null>(null);
+  const priceLinesRef = useRef<any[]>([]);
 
+  // Effect for chart creation and resizing
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    // Create chart
+    const getThemeColors = () => {
+      const style = getComputedStyle(document.body);
+      return {
+        background: style.getPropertyValue('--color-bg'),
+        text: style.getPropertyValue('--color-text-primary'),
+        grid: style.getPropertyValue('--color-border'),
+        crosshair: style.getPropertyValue('--color-text-secondary'),
+      };
+    };
+    const colors = getThemeColors();
+
     const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 500,
+      autosize: false,
       layout: {
-        background: { color: '#ffffff' },
-        textColor: '#333',
+        background: { color: colors.background },
+        textColor: colors.text,
       },
       grid: {
-        vertLines: { color: '#f0f0f0' },
-        horzLines: { color: '#f0f0f0' },
-      },
-      crosshair: {
-        mode: 1,
-      },
-      rightPriceScale: {
-        borderColor: '#cccccc',
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
       },
       timeScale: {
-        borderColor: '#cccccc',
+        borderColor: colors.grid,
         timeVisible: true,
-        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: colors.grid,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: colors.crosshair },
+        horzLine: { color: colors.crosshair },
       },
     });
 
     chartRef.current = chart;
-
-    // Create candlestick series
-    const candlestickSeries = chart.addCandlestickSeries({
+    candlestickSeriesRef.current = chart.addCandlestickSeries({
       upColor: '#26a69a',
       downColor: '#ef5350',
       borderVisible: false,
@@ -53,28 +63,60 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines }) => {
       wickDownColor: '#ef5350',
     });
 
-    candlestickSeriesRef.current = candlestickSeries;
+    // Perform an initial resize to fit the container immediately
+    chart.resize(
+      chartContainerRef.current.clientWidth,
+      chartContainerRef.current.clientHeight
+    );
 
-    // Handle window resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
+    // Then, observe subsequent size changes
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        chart.resize(width, height);
       }
-    };
+    });
 
-    window.addEventListener('resize', handleResize);
+    resizeObserver.observe(chartContainerRef.current);
+
+    // Subscribe to crosshair move event
+    if (onCrosshairMove) {
+      chart.subscribeCrosshairMove((param) => {
+        const dataPoint = param.seriesData.get(candlestickSeriesRef.current);
+        if (dataPoint) {
+          // Lightweight-charts time can be an object { year, month, day } or a string
+          const time = typeof param.time === 'object'
+            ? `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`
+            : param.time;
+
+          onCrosshairMove({
+            time: time as string, // Cast to string as StockData expects string
+            open: (dataPoint as StockData).open,
+            high: (dataPoint as StockData).high,
+            low: (dataPoint as StockData).low,
+            close: (dataPoint as StockData).close,
+            volume: (dataPoint as StockData).volume,
+          });
+        } else {
+          onCrosshairMove(null);
+        }
+      });
+    }
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
+      if (onCrosshairMove) {
+        chart.unsubscribeCrosshairMove((param) => {
+          // Empty callback for unsubscribe
+        });
+      }
       chart.remove();
     };
-  }, []);
+  }, [onCrosshairMove]); // Add onCrosshairMove to dependencies
 
   // Update chart data
   useEffect(() => {
-    if (!candlestickSeriesRef.current || !data.length) return;
+    if (!candlestickSeriesRef.current || !data) return;
 
     const formattedData = data.map(item => ({
       time: item.time,
@@ -85,28 +127,34 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines }) => {
     }));
 
     candlestickSeriesRef.current.setData(formattedData);
+    if (formattedData.length) {
+      chartRef.current?.timeScale().fitContent();
+    }
   }, [data]);
 
   // Update price lines
   useEffect(() => {
-    if (!candlestickSeriesRef.current) return;
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
 
-    // Remove all existing price lines
-    // Note: In a real implementation, we'd track the line references to remove them
-    // For this demo, we recreate them each time
-
-    priceLines.forEach(line => {
-      if (candlestickSeriesRef.current) {
-        candlestickSeriesRef.current.createPriceLine({
-          price: line.price,
-          color: line.color,
-          lineWidth: 2,
-          lineStyle: 2, // dashed
-          axisLabelVisible: true,
-          title: line.label,
-        });
-      }
+    // Clear old price lines
+    priceLinesRef.current.forEach(line => {
+      if (line) series.removePriceLine(line);
     });
+    priceLinesRef.current = [];
+
+    // Create new price lines
+    const newPriceLines = priceLines.map(line => {
+      return series.createPriceLine({
+        price: line.price,
+        color: line.color,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: line.label,
+      });
+    });
+    priceLinesRef.current = newPriceLines;
   }, [priceLines]);
 
   return (

@@ -5,9 +5,11 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithPopup,
 } from 'firebase/auth';
-import { auth } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db, googleProvider } from '../firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,9 +26,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const handleUser = async (user: User | null) => {
+    if (user) {
+      // Create user document on first login
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: user.uid,
+          email: user.email,
+        });
+      }
+    }
+    setUser(user);
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+      handleUser(user);
       setLoading(false);
     });
 
@@ -37,11 +55,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signup = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // The onAuthStateChanged listener will handle user creation
+    await handleUser(userCredential.user);
   };
 
   const logout = async () => {
     await signOut(auth);
+  };
+
+  const signInWithGoogle = async () => {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    // The onAuthStateChanged listener will handle user creation
+    await handleUser(userCredential.user);
   };
 
   const value = {
@@ -49,7 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     login,
     signup,
-    logout
+    logout,
+    signInWithGoogle,
   };
 
   return (

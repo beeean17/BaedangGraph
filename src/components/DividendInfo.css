@@ -1,52 +1,55 @@
 .dividend-info-container {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin: 20px 0;
+  background-color: var(--color-bg);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  height: 100%; /* Fill grid cell */
 }
 
 .dividend-info-container h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: 1.3em;
+  margin: 0 0 var(--spacing-md) 0;
+  color: var(--color-text-primary);
+  font-size: 1.25rem;
 }
 
 .no-dividends {
-  color: #999;
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
 .dividend-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-md);
 }
 
 .dividend-item {
   display: flex;
   justify-content: space-between;
-  padding: 12px;
-  background: #f9f9f9;
-  border-radius: 6px;
-  border-left: 4px solid #667eea;
+  align-items: center;
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
 }
 
 .dividend-date,
 .dividend-amount {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .dividend-item .label {
-  font-size: 0.85em;
-  color: #666;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
   font-weight: 500;
+  text-transform: uppercase;
 }
 
 .dividend-item .value {
-  font-size: 1.1em;
-  color: #333;
+  font-size: 1.1rem;
+  color: var(--color-text-primary);
   font-weight: 600;
 }

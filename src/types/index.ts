@@ -23,11 +23,6 @@ export interface PriceLine {
 export interface UserData {
   uid: string;
   email: string;
-  priceLines: PriceLine[];
-  preferences?: {
-    theme?: 'light' | 'dark';
-    defaultSymbol?: string;
-  };
 }
 
 export interface ChartSettings {
