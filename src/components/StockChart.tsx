@@ -1,5 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts';
+import {
+  createChart,
+  LineStyle,
+  CrosshairMode,
+  type IChartApi,
+  type ISeriesApi,
+  type MouseEventParams,
+  type CandlestickData,
+  type Time,
+} from 'lightweight-charts';
 import type { StockData, PriceLine as PriceLineType } from '../types';
 import './StockChart.css';
 
@@ -11,9 +20,10 @@ interface StockChartProps {
 
 export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCrosshairMove }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
-  const candlestickSeriesRef = useRef<ReturnType<typeof chartRef.current.addCandlestickSeries> | null>(null);
-  const priceLinesRef = useRef<any[]>([]);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const crosshairMoveHandlerRef = useRef<((param: MouseEventParams) => void) | null>(null);
+  const priceLinesRef = useRef<Array<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>>>([]);
 
   // Effect for chart creation and resizing
   useEffect(() => {
@@ -31,7 +41,7 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
     const colors = getThemeColors();
 
     const chart = createChart(chartContainerRef.current, {
-      autosize: false,
+      autoSize: false,
       layout: {
         background: { color: colors.background },
         textColor: colors.text,
@@ -61,6 +71,11 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
       borderVisible: false,
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+      priceFormat: {
+        type: 'price',
+        precision: 0,
+        minMove: 1,
+      },
     });
 
     // Perform an initial resize to fit the container immediately
@@ -81,36 +96,48 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, onCros
 
     // Subscribe to crosshair move event
     if (onCrosshairMove) {
-      chart.subscribeCrosshairMove((param) => {
-        const dataPoint = param.seriesData.get(candlestickSeriesRef.current);
-        if (dataPoint) {
-          // Lightweight-charts time can be an object { year, month, day } or a string
-          const time = typeof param.time === 'object'
-            ? `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`
-            : param.time;
-
-          onCrosshairMove({
-            time: time as string, // Cast to string as StockData expects string
-            open: (dataPoint as StockData).open,
-            high: (dataPoint as StockData).high,
-            low: (dataPoint as StockData).low,
-            close: (dataPoint as StockData).close,
-            volume: (dataPoint as StockData).volume,
-          });
-        } else {
+      const crosshairHandler = (param: MouseEventParams) => {
+        if (!candlestickSeriesRef.current || !param.time) {
           onCrosshairMove(null);
+          return;
         }
-      });
+
+        const series = candlestickSeriesRef.current;
+        const dataPoint = param.seriesData.get(series) as CandlestickData<Time> | undefined;
+        if (!dataPoint || typeof dataPoint.open !== 'number') {
+          onCrosshairMove(null);
+          return;
+        }
+
+        const normalizedTime = typeof param.time === 'object'
+          ? `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`
+          : typeof param.time === 'number'
+            ? new Date(param.time * 1000).toISOString().split('T')[0]
+            : (param.time as string);
+
+        onCrosshairMove({
+          time: normalizedTime,
+          open: Math.trunc(dataPoint.open),
+          high: Math.trunc(dataPoint.high),
+          low: Math.trunc(dataPoint.low),
+          close: Math.trunc(dataPoint.close),
+          volume: undefined,
+        });
+      };
+
+      chart.subscribeCrosshairMove(crosshairHandler);
+      crosshairMoveHandlerRef.current = crosshairHandler;
     }
 
     return () => {
       resizeObserver.disconnect();
-      if (onCrosshairMove) {
-        chart.unsubscribeCrosshairMove((param) => {
-          // Empty callback for unsubscribe
-        });
+      if (crosshairMoveHandlerRef.current) {
+        chart.unsubscribeCrosshairMove(crosshairMoveHandlerRef.current);
+        crosshairMoveHandlerRef.current = null;
       }
       chart.remove();
+      chartRef.current = null;
+      candlestickSeriesRef.current = null;
     };
   }, [onCrosshairMove]); // Add onCrosshairMove to dependencies
 

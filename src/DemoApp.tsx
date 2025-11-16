@@ -63,7 +63,7 @@ export const DemoApp: React.FC = () => {
         <StockChart data={stockData} priceLines={priceLines} />
 
         <div className="info-grid">
-          <DividendInfo dividends={dividends} />
+          <DividendInfo dividends={dividends} loading={false} />
           <PriceLineManager
             priceLines={priceLines}
             onAdd={handleAddPriceLine}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { StockData, DividendData } from '../types';
 
@@ -62,6 +62,11 @@ export const useStockData = (symbol: string) => {
           const monthlyDocs = await Promise.all(monthlyPromises);
           
           const allDaysData: StockData[] = [];
+          const toInteger = (value: unknown) => {
+            const num = typeof value === 'number' ? value : Number(value);
+            return Number.isFinite(num) ? Math.trunc(num) : 0;
+          };
+
           monthlyDocs.forEach(docSnap => {
             if (docSnap.exists()) {
               const monthData = docSnap.data();
@@ -69,10 +74,15 @@ export const useStockData = (symbol: string) => {
               if (monthData.days) {
                 Object.keys(monthData.days).forEach(day => {
                   const dayData = monthData.days[day];
-                  allDaysData.push({
+                  const normalizedDayData: StockData = {
                     time: `${monthStr}-${day.padStart(2, '0')}`,
-                    ...dayData,
-                  });
+                    open: toInteger(dayData.open),
+                    high: toInteger(dayData.high),
+                    low: toInteger(dayData.low),
+                    close: toInteger(dayData.close),
+                    volume: dayData.volume !== undefined ? toInteger(dayData.volume) : undefined,
+                  };
+                  allDaysData.push(normalizedDayData);
                 });
               }
             }

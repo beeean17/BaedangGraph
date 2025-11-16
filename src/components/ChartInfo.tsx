@@ -2,18 +2,22 @@ import React from 'react';
 import type { StockData } from '../types';
 import './ChartInfo.css';
 
+type ChartInfoTime = string | { day: number; month: number; year: number };
 // We might get a partial data point or a full one from the chart
-type ChartInfoData = Partial<StockData> & { time?: string | { day: number; month: number; year: number } };
+type ChartInfoData = Omit<Partial<StockData>, 'time'> & { time?: ChartInfoTime };
 
 interface ChartInfoProps {
   data: ChartInfoData | null;
 }
 
 const formatPrice = (price: number | undefined) => {
-  return price ? price.toFixed(2) : '-';
+  if (price === undefined || price === null) {
+    return '-';
+  }
+  return Math.trunc(price).toString();
 };
 
-const formatDate = (time: ChartInfoData['time']) => {
+const formatDate = (time: ChartInfoTime | undefined) => {
   if (!time) return '-';
   if (typeof time === 'string') {
     return new Date(time).toLocaleDateString();
@@ -46,7 +50,7 @@ export const ChartInfo: React.FC<ChartInfoProps> = ({ data }) => {
             <span className="label">C:</span>
             <span className="value">{formatPrice(data.close)}</span>
           </div>
-          {data.volume && (
+          {data.volume !== undefined && (
             <div className="info-item">
               <span className="label">V:</span>
               <span className="value">{data.volume.toLocaleString()}</span>
