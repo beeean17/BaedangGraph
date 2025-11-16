@@ -99,7 +99,7 @@ export const PriceLineManager: React.FC<PriceLineManagerProps> = ({
                 />
                 <div className="line-details">
                   <span className="line-label">{line.label}</span>
-                  <span className="line-price">${line.price.toFixed(2)}</span>
+                  <span className="line-price">₩{line.price.toFixed(0)}</span>
                 </div>
               </div>
               <button

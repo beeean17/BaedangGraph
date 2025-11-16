@@ -19,6 +19,7 @@ export const DemoApp: React.FC = () => {
     }
   ]);
   const [symbol, setSymbol] = useState('AAPL');
+  const [showDividends, setShowDividends] = useState(true);
 
   const handleAddPriceLine = (line: Omit<PriceLine, 'id'>) => {
     const newLine: PriceLine = {
@@ -58,9 +59,21 @@ export const DemoApp: React.FC = () => {
             <option value="AMZN">AMZN - Amazon.com Inc.</option>
             <option value="TSLA">TSLA - Tesla Inc.</option>
           </select>
+          <button
+            type="button"
+            className="volume-toggle"
+            onClick={() => setShowDividends(prev => !prev)}
+          >
+            {showDividends ? '배당 숨기기' : '배당 표시'}
+          </button>
         </div>
 
-        <StockChart data={stockData} priceLines={priceLines} />
+          <StockChart
+            data={stockData}
+            priceLines={priceLines}
+            dividends={dividends}
+            showDividends={showDividends}
+          />
 
         <div className="info-grid">
           <DividendInfo dividends={dividends} loading={false} />

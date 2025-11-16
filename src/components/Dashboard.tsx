@@ -5,8 +5,8 @@ import { useStockData } from '../hooks/useStockData';
 import { StockChart } from './StockChart';
 import { DividendInfo } from './DividendInfo';
 import { PriceLineManager } from './PriceLineManager';
-import { ChartInfo } from './ChartInfo'; // Import ChartInfo
-import type { StockData } from '../types'; // Import StockData type for state
+import { ChartInfo } from './ChartInfo';
+import type { StockData } from '../types';
 import './Dashboard.css';
 
 export const Dashboard: React.FC = () => {
@@ -14,8 +14,9 @@ export const Dashboard: React.FC = () => {
   const { priceLines, addPriceLine, removePriceLine, updatePriceLine } = useUserData();
   const [symbol, setSymbol] = useState('AAPL'); // Default symbol
   const { stockData, dividends, loading, error } = useStockData(symbol);
-  const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null); // New state for crosshair data
+  const [chartCrosshairData, setChartCrosshairData] = useState<StockData | null>(null);
   const [showVolume, setShowVolume] = useState(true);
+  const [showDividends, setShowDividends] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -62,7 +63,14 @@ export const Dashboard: React.FC = () => {
           >
             {showVolume ? '거래량 숨기기' : '거래량 표시'}
           </button>
-          <ChartInfo data={chartCrosshairData} /> {/* Render ChartInfo here */}
+          <button
+            type="button"
+            className="volume-toggle"
+            onClick={() => setShowDividends(prev => !prev)}
+          >
+            {showDividends ? '배당 숨기기' : '배당 표시'}
+          </button>
+          <ChartInfo data={chartCrosshairData} />
         </div>
 
         {loading && <div className="info-section">Loading chart data...</div>}
@@ -71,8 +79,10 @@ export const Dashboard: React.FC = () => {
           <StockChart
             data={stockData}
             priceLines={priceLines}
+            dividends={dividends}
             showVolume={showVolume}
-            onCrosshairMove={setChartCrosshairData} // Pass the setter function
+            showDividends={showDividends}
+            onCrosshairMove={setChartCrosshairData}
           />
         )}
 

@@ -26,7 +26,7 @@ export const DividendInfo: React.FC<DividendInfoProps> = ({ dividends, loading }
             <div className="dividend-amount">
               <span className="label">Amount:</span>
               <span className="value">
-                {dividend.currency || '$'}{dividend.amount.toFixed(2)}
+                ₩{Math.trunc(dividend.amount).toLocaleString()}
               </span>
             </div>
           </div>

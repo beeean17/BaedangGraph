@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createChart,
   LineStyle,
@@ -9,18 +9,43 @@ import {
   type CandlestickData,
   type HistogramData,
   type Time,
+  type BusinessDay,
 } from 'lightweight-charts';
-import type { StockData, PriceLine as PriceLineType } from '../types';
+import type { StockData, PriceLine as PriceLineType, DividendData } from '../types';
 import './StockChart.css';
+
+const formatDateLabel = (time: Time | string | number | undefined) => {
+  if (!time) return '';
+  if (typeof time === 'string') {
+    return time.split('T')[0];
+  }
+  if (typeof time === 'number') {
+    return new Date(time * 1000).toISOString().split('T')[0];
+  }
+  return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
+};
+
+const toBusinessDay = (dateString: string): BusinessDay | null => {
+  const [yearStr, monthStr, dayStr] = dateString.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  if ([year, month, day].some(value => Number.isNaN(value))) {
+    return null;
+  }
+  return { year, month: month as BusinessDay['month'], day: day as BusinessDay['day'] };
+};
 
 interface StockChartProps {
   data: StockData[];
   priceLines: PriceLineType[];
+  dividends?: DividendData[];
   showVolume?: boolean;
+  showDividends?: boolean;
   onCrosshairMove?: (data: StockData | null) => void;
 }
 
-export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVolume = true, onCrosshairMove }) => {
+export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, dividends = [], showVolume = true, showDividends = true, onCrosshairMove }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -28,6 +53,8 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
   const crosshairMoveHandlerRef = useRef<((param: MouseEventParams) => void) | null>(null);
   const dataRef = useRef<StockData[]>([]);
   const priceLinesRef = useRef<Array<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>>>([]);
+  const [dividendMarkers, setDividendMarkers] = useState<Array<{ id: string; left: number; date: string; amount: number }>>([]);
+  const [activeDividendId, setActiveDividendId] = useState<string | null>(null);
 
   // Effect for chart creation and resizing
   useEffect(() => {
@@ -40,6 +67,7 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
         text: style.getPropertyValue('--color-text-primary'),
         grid: style.getPropertyValue('--color-border'),
         crosshair: style.getPropertyValue('--color-text-secondary'),
+        highlight: style.getPropertyValue('--color-accent') || '#ffbf47',
       };
     };
     const colors = getThemeColors();
@@ -63,8 +91,19 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: colors.crosshair },
-        horzLine: { color: colors.crosshair },
+        vertLine: {
+          color: colors.crosshair,
+          labelBackgroundColor: colors.highlight,
+          labelVisible: true,
+        },
+        horzLine: {
+          color: colors.crosshair,
+          labelBackgroundColor: colors.highlight,
+          labelVisible: true,
+        },
+      },
+      localization: {
+        timeFormatter: (businessDayOrTimestamp) => formatDateLabel(businessDayOrTimestamp) ?? '',
       },
     });
 
@@ -75,11 +114,18 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
       borderVisible: false,
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+      lastValueVisible: false,
+      priceLineVisible: false,
       priceFormat: {
         type: 'price',
         precision: 0,
         minMove: 1,
       },
+    });
+
+    candlestickSeriesRef.current.applyOptions({
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     volumeSeriesRef.current = chart.addHistogramSeries({
@@ -88,8 +134,14 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
         type: 'volume',
       },
       priceLineVisible: false,
+      lastValueVisible: false,
       color: '#26a69a',
       baseLineVisible: false,
+    });
+
+    volumeSeriesRef.current.applyOptions({
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
 
     chart.priceScale('right').applyOptions({
@@ -133,13 +185,14 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
           return;
         }
 
-        const normalizedTime = typeof param.time === 'object'
-          ? `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`
-          : typeof param.time === 'number'
-            ? new Date(param.time * 1000).toISOString().split('T')[0]
-            : (param.time as string);
+        const normalizedTime = formatDateLabel(param.time as Time | string | number);
 
         const matchedVolume = dataRef.current.find(item => item.time === normalizedTime)?.volume;
+
+        if (!normalizedTime) {
+          onCrosshairMove(null);
+          return;
+        }
 
         onCrosshairMove({
           time: normalizedTime,
@@ -168,12 +221,69 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
     };
   }, [onCrosshairMove]);
 
+  const updateDividendMarkers = useCallback(() => {
+    if (!chartRef.current || !chartContainerRef.current || !dividends.length || !showDividends) {
+      setDividendMarkers([]);
+      setActiveDividendId(null);
+      return;
+    }
+
+    const timeScale = chartRef.current.timeScale();
+    const container = chartContainerRef.current;
+    const styles = getComputedStyle(container);
+    const paddingLeft = parseFloat(styles.paddingLeft || '0');
+    const paddingRight = parseFloat(styles.paddingRight || '0');
+    const innerWidth = container.clientWidth - paddingLeft - paddingRight;
+
+    const markers = dividends
+      .map((dividend, index) => {
+        const businessDay = toBusinessDay(dividend.date);
+        const coordinate = businessDay ? timeScale.timeToCoordinate(businessDay) : null;
+        if (coordinate === null || coordinate === undefined) {
+          return null;
+        }
+        return {
+          id: `${dividend.date}-${index}`,
+          left: coordinate,
+          date: dividend.date,
+          amount: dividend.amount,
+        };
+      })
+      .filter((marker): marker is { id: string; left: number; date: string; amount: number } => {
+        return marker !== null && marker.left >= 0 && marker.left <= innerWidth;
+      });
+
+    setDividendMarkers(markers);
+    setActiveDividendId(prev => (markers.some(marker => marker.id === prev) ? prev : null));
+  }, [dividends, showDividends]);
+
+  useEffect(() => {
+    updateDividendMarkers();
+  }, [updateDividendMarkers, data]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const handler = () => updateDividendMarkers();
+    const timeScale = chart.timeScale();
+    timeScale.subscribeVisibleLogicalRangeChange(handler);
+    return () => {
+      timeScale.unsubscribeVisibleLogicalRangeChange(handler);
+    };
+  }, [updateDividendMarkers]);
+
+  useEffect(() => {
+    const handleResize = () => updateDividendMarkers();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateDividendMarkers]);
+
   // Update chart data
   useEffect(() => {
     if (!candlestickSeriesRef.current || !data) return;
 
     const formattedData = data.map(item => ({
-      time: item.time,
+      time: toBusinessDay(item.time) ?? item.time,
       open: item.open,
       high: item.high,
       low: item.low,
@@ -191,7 +301,7 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
   useEffect(() => {
     if (!volumeSeriesRef.current) return;
     const formattedVolume: HistogramData<Time>[] = data.map(item => ({
-      time: item.time,
+      time: toBusinessDay(item.time) ?? item.time,
       value: item.volume ?? 0,
       color: item.close >= item.open ? '#26a69a' : '#ef5350',
     }));
@@ -241,6 +351,37 @@ export const StockChart: React.FC<StockChartProps> = ({ data, priceLines, showVo
   return (
     <div className="stock-chart-container">
       <div ref={chartContainerRef} className="chart" />
+      {showDividends && dividendMarkers.length > 0 && (
+        <div className="dividend-overlay" aria-label="dividend markers">
+          {dividendMarkers.map(marker => (
+            <div
+              key={marker.id}
+              className="dividend-marker"
+              style={{ left: `${marker.left}px` }}
+            >
+              <div className="dividend-marker-line" />
+              <button
+                type="button"
+                className="dividend-marker-button"
+                style={{ pointerEvents: 'auto' }}
+                onMouseDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveDividendId(prev => (prev === marker.id ? null : marker.id));
+                }}
+              >
+                D
+              </button>
+              {activeDividendId === marker.id && (
+                  <div className="dividend-tooltip" style={{ pointerEvents: 'auto' }}>
+                  <div>날짜: {new Date(marker.date).toLocaleDateString('ko-KR')}</div>
+                  <div>배당금: ₩{Math.trunc(marker.amount).toLocaleString()}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
