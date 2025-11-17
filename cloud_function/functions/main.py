@@ -4,6 +4,7 @@ import argparse
 import datetime as dt
 import logging
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
@@ -34,7 +35,7 @@ initialize_app()
 db = firestore.client()
 
 KST = dt.timezone(dt.timedelta(hours=9))
-BASE_URL = os.environ.get("HANKOOK_BASE_URL", "https://openapi.koreainvestment.com:9443")
+BASE_URL = os.environ.get("HANKOOK_BASE_URL", "https://openapi.koreainvestment.com:29443")
 APP_KEY_ENV = "HANKOOK_APP_KEY"
 APP_SECRET_ENV = "HANKOOK_APP_SECRET"
 
@@ -119,6 +120,20 @@ def _request_access_token(session: requests.Session) -> str:
 	return token
 
 
+def _extract_volume(symbol: str, item: Dict[str, object]) -> float:
+	"""Return the best-effort volume field, defaulting to 0 on missing data."""
+	for key in ("acml_vol", "acml_tr_qnty", "acml_tr_pbmn"):
+		value = item.get(key)
+		if value in (None, ""):
+			continue
+		try:
+			return float(value)
+		except (TypeError, ValueError):
+			LOG.warning("[%s] %s 값을 float로 변환하지 못했습니다: %s", symbol, key, value)
+	LOG.warning("[%s] API 응답에 거래량 필드가 없어 0으로 기록합니다.", symbol)
+	return 0.0
+
+
 def _fetch_daily_candle(
 	session: requests.Session,
 	token: str,
@@ -141,7 +156,22 @@ def _fetch_daily_candle(
 		"appsecret": os.environ.get(APP_SECRET_ENV, ""),
 		"tr_id": "FHKST01010400",
 	}
-	response = session.get(url, headers=headers, params=params, timeout=20)
+	for attempt in range(3):
+		try:
+			response = session.get(url, headers=headers, params=params, timeout=20)
+			if response.status_code >= 500:
+				raise requests.HTTPError(response=response)
+			break
+		except requests.HTTPError as exc:
+			status = exc.response.status_code if exc.response else None
+			if status and 500 <= status < 600 and attempt < 2:
+				LOG.warning("[%s] API 5xx (시도 %d/3) 재시도합니다: %s", symbol, attempt + 1, status)
+				time.sleep(2 * (attempt + 1))
+				continue
+			raise
+	else:
+		return None
+
 	if response.status_code == 404:
 		LOG.warning("[%s] API에서 데이터를 찾을 수 없습니다.", symbol)
 		return None
@@ -162,7 +192,7 @@ def _fetch_daily_candle(
 				high=float(item["stck_hgpr"]),
 				low=float(item["stck_lwpr"]),
 				close=float(item["stck_clpr"]),
-				volume=float(item["acml_tr_pbmn"]),
+				volume=_extract_volume(symbol, item),
 			)
 
 	LOG.warning("[%s] %s 데이터가 없어 latest 값을 사용합니다.", symbol, target_str)
@@ -173,7 +203,7 @@ def _fetch_daily_candle(
 		high=float(first["stck_hgpr"]),
 		low=float(first["stck_lwpr"]),
 		close=float(first["stck_clpr"]),
-		volume=float(first["acml_tr_pbmn"]),
+		volume=_extract_volume(symbol, first),
 	)
 
 
