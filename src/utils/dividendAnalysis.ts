@@ -1,4 +1,5 @@
 import type { DividendData, DividendRangeStat, StockData } from '../types';
+import { normalizeDateString } from './date';
 
 const compareDateStrings = (a: string, b: string) => a.localeCompare(b);
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -24,7 +25,7 @@ export const buildDividendRangeStats = (
 
   const normalizedDividends = dividends.map(dividend => ({
     ...dividend,
-    date: dividend.date.split('T')[0],
+    date: normalizeDateString(dividend.date),
   }));
 
   const sortedDividends = normalizedDividends.sort((a, b) => compareDateStrings(a.date, b.date));
@@ -42,7 +43,12 @@ export const buildDividendRangeStats = (
     return [];
   }
 
-  const sortedStock = [...stockData].sort((a, b) => compareDateStrings(a.time, b.time));
+  const sortedStock = stockData
+    .map(point => ({
+      ...point,
+      time: normalizeDateString(point.time),
+    }))
+    .sort((a, b) => compareDateStrings(a.time, b.time));
 
   const stats: DividendRangeStat[] = [];
 

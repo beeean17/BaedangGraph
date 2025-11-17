@@ -28,7 +28,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  transform: translateX(-0.5px);
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
@@ -73,4 +73,23 @@
   color: var(--color-text-primary);
   pointer-events: auto;
   z-index: 4;
+}
+
+@media (max-width: 768px) {
+  .dividend-marker-line {
+    width: 1px;
+    opacity: 0.35;
+    bottom: 40px;
+  }
+
+  .dividend-marker-button {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    bottom: 24px;
+  }
+
+  .dividend-tooltip {
+    font-size: 0.7rem;
+    padding: 4px 6px;
+  }
 }

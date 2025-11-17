@@ -9,53 +9,11 @@ import {
   type CandlestickData,
   type HistogramData,
   type Time,
-  type BusinessDay,
   type SeriesMarker,
 } from 'lightweight-charts';
 import type { StockData, PriceLine as PriceLineType, DividendData, DividendRangeStat } from '../types';
+import { formatDateLabel, normalizeDateString, toChartTime, toTimestamp } from '../utils/date';
 import './StockChart.css';
-
-const formatDateLabel = (time: Time | string | number | undefined) => {
-  if (!time) return '';
-  if (typeof time === 'string') {
-    return time.split('T')[0];
-  }
-  if (typeof time === 'number') {
-    return new Date(time * 1000).toISOString().split('T')[0];
-  }
-  return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
-};
-
-const normalizeDateString = (value: string) => {
-  if (!value) return '';
-  return value.includes('T') ? value.split('T')[0] : value;
-};
-
-const toBusinessDay = (dateString: string): BusinessDay | null => {
-  const normalized = normalizeDateString(dateString);
-  if (!normalized) return null;
-  const [yearStr, monthStr, dayStr] = normalized.split('-');
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  const day = Number(dayStr);
-  if ([year, month, day].some(value => Number.isNaN(value))) {
-    return null;
-  }
-  return { year, month: month as BusinessDay['month'], day: day as BusinessDay['day'] };
-};
-
-const toTimestamp = (dateString: string): number | null => {
-  const normalized = normalizeDateString(dateString);
-  const timestamp = Date.parse(normalized);
-  return Number.isNaN(timestamp) ? null : timestamp;
-};
-
-const toChartTime = (dateString: string): Time | null => {
-  const businessDay = toBusinessDay(dateString);
-  if (businessDay) return businessDay;
-  const timestamp = toTimestamp(dateString);
-  return timestamp !== null ? (timestamp / 1000) as Time : null;
-};
 
 interface StockChartProps {
   data: StockData[];
@@ -260,26 +218,38 @@ export const StockChart: React.FC<StockChartProps> = ({
     }
 
     const timeScale = chartRef.current.timeScale();
-    const container = chartContainerRef.current;
-    const styles = getComputedStyle(container);
-    const paddingLeft = parseFloat(styles.paddingLeft || '0');
-    const paddingRight = parseFloat(styles.paddingRight || '0');
-    const innerWidth = container.clientWidth - paddingLeft - paddingRight;
+    const chartNode = chartContainerRef.current;
+    const overlayHost = chartNode.parentElement;
+    if (!overlayHost) {
+      setDividendMarkers([]);
+      setActiveDividendId(null);
+      return;
+    }
+
+    const chartRect = chartNode.getBoundingClientRect();
+    const hostRect = overlayHost.getBoundingClientRect();
+    const offsetLeft = chartRect.left - hostRect.left;
+    const visibleWidth = chartRect.width;
 
     const markers = dividends.reduce<Array<{ id: string; left: number; date: string; amount: number }>>((acc, dividend, index) => {
-      const time = toChartTime(dividend.date);
+      const normalizedDate = normalizeDateString(dividend.date);
+      const time = toChartTime(normalizedDate);
       const coordinate = time ? timeScale.timeToCoordinate(time) : null;
       if (coordinate === null || coordinate === undefined) {
         return acc;
       }
       const relativeLeft = Number(coordinate);
-      if (Number.isNaN(relativeLeft) || relativeLeft < 0 || relativeLeft > innerWidth) {
+      if (
+        Number.isNaN(relativeLeft) ||
+        relativeLeft < 0 ||
+        relativeLeft > visibleWidth
+      ) {
         return acc;
       }
       acc.push({
         id: `${dividend.date}-${index}`,
-        left: relativeLeft + paddingLeft,
-        date: dividend.date,
+        left: offsetLeft + relativeLeft,
+        date: normalizedDate,
         amount: dividend.amount,
       });
       return acc;

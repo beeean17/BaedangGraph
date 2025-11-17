@@ -17,6 +17,7 @@ _업데이트: 2025-11-17_
 - `ResizeObserver`와 커스텀 레이아웃 로직으로 반응형 차트 크기 유지
 - 차트 크로스헤어 데이터를 `ChartInfo`로 전달해 날짜/OHLC/거래량/배당을 동기 표시
 - 거래량 / 배당 오버레이 토글 버튼 및 로딩 오버레이 UX 구현
+- `DividendRangeAnalysis`와 `StockChart`가 동일한 날짜 축을 공유하도록 교정하고, 배당 세로선이 캔들 중앙을 통과하며 모바일에서도 겹치지 않도록 스타일/opacity를 보정
 
 ## 4. 배당 & 통계 기능
 - `DividendInfo`, `DividendRangeAnalysis` 컴포넌트로 연간/구간 배당 요약 제공
@@ -38,7 +39,7 @@ _업데이트: 2025-11-17_
 - README / firebase_data_structure.md / PROJECT_STATUS.md 등 문서화 강화
 
 ## 작업중인 기능
-- 배당 세로선 위치 조정: 차트 내 배당 이벤트 마커의 세로선이 실제 시점에 정확히 맞도록 위치/스타일 다듬기.
+- (현재 진행 중인 작업 없음)
 
 ## 앞으로 할 작업
 1. Firebase Cloud Functions에서 한국투자증권 API를 호출해 데이터 적재 자동화.

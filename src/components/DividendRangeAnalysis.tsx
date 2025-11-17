@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DividendRangeStat } from '../types';
+import { normalizeDateString } from '../utils/date';
 import './DividendRangeAnalysis.css';
 
 interface DividendRangeAnalysisProps {
@@ -7,7 +8,11 @@ interface DividendRangeAnalysisProps {
   loading: boolean;
 }
 
-const formatDate = (date: string) => new Date(date).toLocaleDateString('ko-KR');
+const formatDate = (date: string) => {
+  const normalized = normalizeDateString(date);
+  if (!normalized) return '-';
+  return new Date(`${normalized}T00:00:00`).toLocaleDateString('ko-KR');
+};
 const formatDays = (days?: number) => {
   if (days === undefined) return '-';
   const sign = days > 0 ? '+' : days < 0 ? '-' : '';
