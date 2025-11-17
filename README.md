@@ -198,6 +198,21 @@ npm run build
 firebase deploy
 ```
 
+## Automated OHLCV Sync (GitHub Actions)
+
+Firebase Spark 요금제에서는 Python Cloud Functions 배포가 불가능하기 때문에, 일별 OHLCV 수집 작업은 GitHub Actions 스케줄러(`.github/workflows/ohlcv-sync.yml`)로 실행됩니다. 매일 15:40 KST(UTC 06:40)에 워크플로가 실행되어 `cloud_function/functions/main.py`를 직접 호출합니다.
+
+### 필요한 GitHub Secrets
+
+| Secret 이름 | 설명 |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT` | Firestore에 쓰기 위한 Firebase 서비스 계정 JSON 전체 문자열 |
+| `HANKOOK_APP_KEY` | 한국투자증권 API App Key |
+| `HANKOOK_APP_SECRET` | 한국투자증권 API App Secret |
+| `HANKOOK_BASE_URL` (선택) | 기본 API URL을 바꾸고 싶을 때 설정 |
+
+Secrets를 추가한 뒤 워크플로를 활성화하면, Actions가 자동으로 종가 데이터를 Firestore에 적재합니다. 일정 변경이나 수동 실행은 GitHub Actions UI에서 조정할 수 있습니다.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
